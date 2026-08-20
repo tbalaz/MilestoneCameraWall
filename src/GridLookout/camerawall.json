@@ -1,0 +1,130 @@
+{
+  "ManagementServerUri": "",
+  "AuthMode": "Basic",               // Basic (XProtect basic user) | Windows (AD/local mirror account via Username+Domain) — both explicit, fill in Username/Password below
+  "Username": "",
+  "Domain": "",                      // Windows mode only
+  "Password": "",                    // fill in plaintext on first run; the app encrypts it to PasswordProtected (DPAPI) and blanks this field on the next start
+  "PasswordProtected": "",
+  "AllowInsecureBasic": false,
+  "RecorderNameOverride": "",
+  "ReconnectSeconds": 15,
+  "ConfigRefreshSeconds": 60,
+  "LogLevel": "Info",
+  "LogRetentionDays": 30,             // days of gridlookout-*.log files to keep (per-user variants too); 0 = keep forever
+  "ShowHeader": false,
+  "TileBorderWidth": 1,
+  "TileBorderColor": "#404040",
+  "StaleSeconds": 10,
+  "TileRecoverSeconds": 30,          // per-tile self-heal: a stalled or never-framed tile reconnects on its own without needing every tile to be stale (whole-wall recovery). 0 disables per-tile recovery entirely; nonzero floored at 10. Doubles each retry up to 8x this value. If StaleSeconds is 0 (no STALLED overlay), a framed tile still uses this value as its own stale-onset threshold, so first reconnect lands at ~2x TileRecoverSeconds after last frame, not 1x.
+  "FitFrameSizeToTile": true,
+  "MaxFps": 12,
+  "PageSeconds": 0,                  // seconds per page before rotating; 0 = rotation off. Applies to auto-layout pages AND multi-page $layout{} matrices alike; a single-page matrix has nothing to rotate and ignores it.
+  "PageSize": 9,                     // cameras per rotating page; only the current page's live streams exist, so RAM scales with this, not total camera count
+  "TileRotateSeconds": 10,           // seconds between camera flips for a $layout{} rotating cell, e.g. A(3,4,5); floored at 5s (a flip reconnects the stream)
+  "TileScaleMode": "Fit",            // Fit (aspect-preserving letterbox) | Fill (aspect-preserving cover, crops overflow) | Stretch (ignores aspect ratio); case-insensitive, bad value falls back to Fit with a warning
+  "KeepDisplayAwake": true,
+  "KioskLock": false,                // true disables Esc-exit and the double-click compact/fullscreen toggle on every wall window, so a passerby cannot blank or de-kiosk the wall (S8); F9/minimize is NOT an exception — this product has no minimize hotkey. With this on, the only operator stop path is Task Manager or an MSI uninstall, so leave it false unless the deployment is unattended and public-facing.
+  "WindowBounds": null,
+  // Example override — uncomment and adjust to pin the first/default monitor's window to exact
+  // desktop coordinates/size instead of fullscreen (still borderless, still topmost; other
+  // configured monitors always stay fullscreen):
+  // "WindowBounds": { "X": 0, "Y": 0, "Width": 1920, "Height": 1080 },
+  "Monitors": [
+    { "Monitor": 1, "Cameras": "all" }
+  ],
+  // Wall-health monitoring — OFF by default (Enabled: false writes nothing at all). When on, the
+  // running wall writes health.json (liveness/aggregate counts — never camera names, VMS URI, or
+  // credentials; multi-recorder mode's per-recorder rollup does carry recorder display names) under
+  // the same writable state directory as this config file, on a 5s timer.
+  // GridLookout.exe --health-probe reads it back, checks the recorded process is actually still
+  // alive and its UI thread isn't hung, and exits 0 (healthy) / 1 (degraded) / 2 (hung) / 3
+  // (absent) — see docs/security.md and scripts/install-kiosk.ps1's watchdog task for
+  // how that CLI mode is invoked. No inbound listener either way; Endpoint below is an OPTIONAL
+  // outbound POST made only by --health-probe itself, never by the running wall process.
+  "Health": {
+    "Enabled": false,
+    "ControllerId": "",                // free-text identity for telling multiple walls apart in your own collector; defaults to the machine name when blank
+    "Endpoint": "",                    // optional HTTPS URL --health-probe POSTs the raw health.json content to; blank = no POST ever attempted. Refused over plain http:// unless AllowInsecureEndpoint below opts in.
+    "AllowInsecureEndpoint": false,    // must be true to allow the POST (bearer token + health content, cleartext) to a plain http:// Endpoint — lab/dev only, mirrors AllowInsecureLayoutPoll below
+    "StaleAfterSeconds": 30,           // UI-pulse age past which the probe judges the process hung rather than merely quiet
+    "TimeoutSeconds": 5,               // bounds how long a single --health-probe invocation can block on an unreachable Endpoint
+    "BearerToken": "",                 // fill in plaintext on first run if Endpoint needs one; the app encrypts it to BearerTokenProtected (DPAPI) and blanks this field on the next start, exactly like Password above
+    "BearerTokenProtected": ""
+  },
+  // Referentially stable $layout{} references (stable across camera renames/reorders/enable-disable
+  // toggles). A $layout{} cell can be written three ways: a legacy ordinal ("A1" — the camera's
+  // position in the sorted enabled-camera list; UNSTABLE across renames/reorders, kept only for
+  // backward compatibility), an alias ("A@front-gate" — looked up here, in CameraBindings), or a
+  // literal camera guid ("A@{8-4-4-4-12-hex-guid}" — the camera's own FQID ObjectId, no lookup
+  // needed). Rotation cells can freely mix all three: "A(3,@yard-east,@{...})".
+  //
+  // Any cell form above can carry a ":RxC" span suffix to make it occupy more than one grid
+  // position, e.g. a hero camera spanning 2 rows x 2 columns beside five ordinary tiles:
+  // "$layout{A1:2x2,A3;-,-,B4;C5,C6,C7}" — the "-" placeholders mark every extra position the
+  // hero's span still covers (never inferred). The moment a page uses any span or "-" it becomes a
+  // uniform grid: every row's total column coverage must be equal, and ";" becomes a REAL row
+  // separator instead of just a readability alternative to ",". See docs/admin-guide.md
+  // ("Cell spans and the '-' placeholder") for the full grammar and more examples.
+  //
+  // CameraBindings maps your own stable alias (lowercase letters/digits/hyphens only, e.g.
+  // "front-gate", "loading-dock-2") to a camera's guid string. Run
+  // `GridLookout.exe --export-camera-bindings` to log in and print/write a ready-to-paste skeleton
+  // (camera-bindings.generated.json, next to this file) with a suggested alias per camera already
+  // filled in — copy the entries you want straight into this section. An alias with a bad format or
+  // an unparseable guid is dropped at startup with a warning in the log; every other entry still
+  // loads. First-write-wins on a duplicate alias (case-insensitive).
+  "CameraBindings": {
+    // "front-gate": "8fa2c1e4-1b3d-4a5e-9c6f-2d7e8b9a0c1d"
+  },
+  // Multi-recorder walls: show cameras from SEVERAL recording servers under this ONE Management
+  // Server (one login, one session) instead of just the recorder this host self-locates as. Empty
+  // (the default, as below) or absent = single-recorder mode, unchanged from every prior release.
+  // Non-empty = multi-recorder mode. Each entry selects ONE recorder by EITHER its stable Id (the
+  // recorder's guid — authoritative, preferred) OR its exact registered HostName (a migration
+  // fallback) — never both, never neither (an entry with both or neither set is dropped with a
+  // warning in the log). This list is NEVER implicit: it never auto-expands to "every recorder", so
+  // adding a new recorder to the site can't silently open dozens of new streams on an existing wall.
+  // Selection precedence overall: --recorder CLI arg (forces legacy single-recorder mode) >
+  // non-empty RecordingServers[] (multi mode, this section) > RecorderNameOverride (legacy single
+  // mode) > hostname self-location (legacy single mode). Editing this list requires a restart — it
+  // is not hot-reloaded.
+  "RecordingServers": [
+    // { "Id": "8fa2c1e4-1b3d-4a5e-9c6f-2d7e8b9a0c1d" },
+    // { "HostName": "rec02.internal" }
+  ],
+  // Multi-recorder mode ONLY: the $layout{}/$layoutN{} matrix for a multi-recorder wall — same
+  // grammar as the recorder-Description-based tokens above, just read from this config string
+  // instead. A non-blank value here always wins outright, unconditionally — see LayoutRecorder
+  // below for what supplies the layout when this is left blank instead.
+  // A plain ordinal reference here (e.g. "A3") indexes the MERGED camera list across every selected
+  // recorder, sorted by "RecorderName / CameraName" — legal, but that order shifts whenever ANY
+  // selected recorder's camera set changes, not just the one you're thinking about; prefer
+  // @alias/@{guid} references (CameraBindings above), which stay stable across recorder/camera
+  // churn exactly like they do in single-recorder mode. GridLookout logs an INFO advisory at startup
+  // if an ordinal is used here (or in Monitors[].Cameras) while multi-recorder mode is active.
+  // Single-recorder mode ignores this field entirely and keeps reading the recorder's own
+  // Description exactly as before.
+  // "Layout": "$layout{A@front-gate,B@loading-dock}"
+  "Layout": "",
+  // Multi-recorder mode ONLY, and only consulted when Layout above is blank: which ONE selected
+  // recorder's own Description supplies $layout{} tokens (the "layout-carrier" recorder) — either
+  // its display Name (exact, case-insensitive) or its stable Id (guid string) — NEVER a HostName;
+  // matched against the CURRENTLY selected recorders only. This is what lets an operator manage a
+  // multi-recorder wall's layout from Management Client (edit the carrier recorder's Description,
+  // same workflow as single-recorder mode — see docs/admin-guide.md's "Multi-recorder
+  // walls") instead of editing this file and restarting.
+  // Blank (default) = auto-carrier: floats to the FIRST RecordingServers[] entry, since no authority
+  // was ever named. Non-blank = PINNED: a value that currently matches no selected recorder (or
+  // matches more than one sharing that display name — use the Id instead) does NOT fall back to
+  // another recorder's Description; the wall keeps its last-known-good layout, logs a warning, and
+  // flags health.json's LayoutCarrierPinned until this value resolves to exactly one selected
+  // recorder again ("authority resumes" — no restart needed).
+  // "LayoutRecorder": "8fa2c1e4-1b3d-4a5e-9c6f-2d7e8b9a0c1d" (matches the RecordingServers[] Id
+  // example above) — or the recorder's exact display Name instead, e.g. "LayoutRecorder": "REC-02"
+  "LayoutRecorder": "",
+  // The layout-carrier description poll (both single- and multi-recorder mode) sends this app's
+  // Milestone session token as an Authorization: Bearer header. Refused over plain http:// unless
+  // explicitly opted in here — mirrors AllowInsecureBasic above. Default false; set true only for a
+  // lab/dev environment, never for a production install.
+  "AllowInsecureLayoutPoll": false
+}

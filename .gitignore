@@ -1,0 +1,6 @@
+bin/
+obj/
+*.user
+camerawall.local.json
+logs/
+runlogs/

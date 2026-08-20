@@ -1,0 +1,130 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- net48 pin — NOT the net8 pin the rest of this repo uses for the MIP SDK. MIP SDK 25.2.3
+         ships only net47/net472 assemblies, and its login path binds Framework-only assemblies
+         (System.ServiceModel, System.IdentityModel) with no modern-.NET facade — a hard
+         dependency on net48, not a packaging inconvenience. WCF/IdentityModel are in-box on net48,
+         and net48 is preinstalled on Windows Server/10/11, so the kiosk still needs zero runtime
+         install. -->
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- T4: scoped to this project (and its test project) only — the rest of the solution is out
+         of scope for this flag. Nullable is already enabled above; this makes a CS8602-class
+         regression a build break instead of a silently-accumulating warning. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- L4/I8/T1: Version is the ONE source of truth for the product version. The SDK derives
+         AssemblyVersion/AssemblyFileVersion from it automatically when those two properties are
+         left unset, as they are here — do NOT add explicit <AssemblyVersion>/<FileVersion>
+         properties, that would just be the same number hardcoded a second time and able to drift
+         from this one. MilestoneSession.Login also reads this exact version
+         (typeof(MilestoneSession).Assembly.GetName().Version) for the III integration login string
+         ("Logged in ... as integration 'GridLookout' vX.Y.Z"), so it agrees with the assembly and
+         the MSI ProductVersion too. installer/build-gridlookout.ps1 takes its own -Version
+         parameter (default "1.0.0") for the WiX ProductVersion define AND now passes the same value
+         through as `-p:Version=$Version` to this build (`dotnet build /p:Version=X.Y.Z`, an MSBuild
+         global property, wins over the project-file value below) — a release build always gets its
+         version from the ONE -Version argument to that script; the value here is only the default
+         used by a plain `dotnet build`/`dotnet run` outside that script (dev/debug runs). Bump this
+         default at each release so a dev build's login string isn't stale. -->
+    <Version>1.0.1</Version>
+    <AssemblyName>GridLookout</AssemblyName>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <RootNamespace>GridLookout</RootNamespace>
+    <!-- L4/I8: procurement-facing identity — the ARP/Manufacturer field in
+         installer/Product.GridLookout.wxs is out of scope here (owned by the installer builder),
+         but the exe's own AssemblyCompany/AssemblyProduct/AssemblyCopyright must not default to
+         the bare AssemblyName ("GridLookout") the SDK falls back to when these are unset. -->
+    <Company>IT42 d.o.o.</Company>
+    <Product>GridLookout</Product>
+    <Copyright>© 2026 IT42 d.o.o.</Copyright>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- VideoOS.Platform.SDK.UI.dll (ImageViewerControl-family types) ships INSIDE the
+         MilestoneSystems.VideoOS.Platform.SDK package itself (lib/net472/VideoOS.Platform.SDK.UI.dll)
+         as of 25.2.3 — no separate ".SDK.UI" package exists on nuget.org; do not add one. A net48
+         project's lib/net472 assets resolve as normal compile-time references via standard NuGet
+         framework compatibility (net472 <= net48) — no explicit HintPath <Reference> needed. -->
+    <PackageReference Include="MilestoneSystems.VideoOS.Platform" Version="25.2.3" />
+    <PackageReference Include="MilestoneSystems.VideoOS.Platform.SDK" Version="25.2.3" />
+    <!-- net48 ships WCF (System.ServiceModel/System.IdentityModel) in-box — this is WHY the
+         project targets net48 at all (see the TargetFramework comment above); no
+         System.ServiceModel.* package references are needed here. -->
+    <!-- WallConfigLoader uses System.Text.Json (System.Text.Json.Nodes.JsonObject/JsonNode) —
+         in-box on net8, but net48 needs the package. -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="camerawall.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- TrimUnusedSdkPayload: Release-only post-build delete of unused MIP SDK payload (audio
+       codecs, Azure/MSAL auth stacks, legacy Web.Http/Owin hosting, AVI/DB-utility export
+       tooling, GPU-encoder codec DLLs) — safe to delete post-build but NOT safe to reference-strip
+       at the PackageReference level (the SDK ships it as part of one package, not separable NuGet
+       deps). Debug builds stay untouched so debugging/attach-to-process workflows keep the full
+       SDK payload. Do NOT add or subtract names without a live retest against a running wall.
+       Deliberately excluded — required: VideoOS.UI.Common.WPF*, Microsoft.Xaml.Behaviors,
+       Microsoft.ApplicationInsights, System.Net.Http.Formatting, the Microsoft.IdentityModel.* /
+       System.IdentityModel.Tokens.Jwt stack (OAuth login), Autofac, Microsoft.Bcl.AsyncInterfaces,
+       Microsoft.Extensions.Logging.Abstractions / .DependencyInjection.Abstractions. -->
+  <Target Name="TrimUnusedSdkPayload" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <_UnusedSdkPayload Include="$(OutputPath)NAudio.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)NAudio.Core.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)NAudio.Asio.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)NAudio.Midi.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)NAudio.Wasapi.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)NAudio.WinForms.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)NAudio.WinMM.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)Azure.Core.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)Azure.Identity.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)Microsoft.Identity.Client.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)Microsoft.Identity.Client.Extensions.Msal.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)Microsoft.AspNetCore.JsonPatch.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)System.Web.Http.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)System.Web.Http.Owin.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)Owin.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)Microsoft.Owin.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)AVIExporterClientMW.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)VideoOS.Platform.SDK.Export.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)VideoOS.DatabaseUtility.Common.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)VideoOS.DatabaseUtility.MediaStorage.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)cudart64_12.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)nppc64_12.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)nppig64_12.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)avfilter-10.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)avdevice-61.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)libmfxsw64.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)libmfxaudiosw64.dll" />
+      <!-- T5/L7: GridLookout is JPEG-only (JPEGLiveSource — see LiveTileSource.cs), so it never
+           exercises any hardware/codec decode path, HEVC included. mfxplugin64_hevcd_sw.dll is
+           Intel's software HEVC decoder plugin; HEVC is patent-pool-encumbered and this product
+           doesn't use it — see docs/gridlookout-NOTICES.md section 3 for the open
+           redistribution-rights question that motivated dropping it rather than shipping it
+           unused. plugin.cfg is its companion manifest. Unlike every other entry in this list,
+           SDK 25.2.3 does NOT copy these two flat into $(OutputPath) — they land nested under a
+           NuGet-content-hash-named subfolder instead (verified: e.g.
+           bin\Release\net48\15dd936825ad475ea34e35f3f54217a6\mfxplugin64_hevcd_sw.dll). That hash
+           is package-internal and not a contract, so match it with a recursive wildcard rather
+           than hardcoding the folder name — robust to the hash changing on a future SDK bump, and
+           still a no-op (not an error) if a future SDK version drops these files entirely. -->
+      <_UnusedSdkPayload Include="$(OutputPath)**\mfxplugin64_hevcd_sw.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)**\plugin.cfg" />
+      <_UnusedSdkPayload Include="$(OutputPath)C5.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)System.Security.Cryptography.Xml.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)System.IO.FileSystem.AccessControl.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)System.Security.AccessControl.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)System.Security.Principal.Windows.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)Microsoft.Win32.Registry.dll" />
+      <_UnusedSdkPayload Include="$(OutputPath)System.Memory.Data.dll" />
+    </ItemGroup>
+    <Delete Files="@(_UnusedSdkPayload)" TreatErrorsAsWarnings="false" />
+  </Target>
+</Project>
