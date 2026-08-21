@@ -1,0 +1,26 @@
+GridLookout (formerly published as MilestoneCameraWall)
+
+Required Notice: Copyright 2026 IT42 d.o.o. (https://it42.hr)
+
+Licensed under the PolyForm Noncommercial License 1.0.0 — see LICENSE.
+Personal, hobby, research, and noncommercial-organization use is free.
+A 30-day commercial evaluation is available under the PolyForm Free Trial
+License 1.0.0 — see LICENSE-TRIAL. Any other commercial or business use
+requires a separate license from IT42 d.o.o. — see COMMERCIAL-LICENSE.md.
+
+Created by Tomislav Balaz (https://github.com/tbalaz).
+
+Per the license's Notices section, anyone who redistributes any part of this
+software must include the license terms and the Required Notice line above.
+
+Third-party components: this repository contains no Milestone Systems code or
+binaries. It references the Milestone MIP SDK NuGet packages
+(MilestoneSystems.VideoOS.Platform, MilestoneSystems.VideoOS.Platform.SDK),
+which are downloaded at build time from nuget.org and are licensed separately
+by Milestone Systems A/S under their own SDK license terms. The PolyForm
+Noncommercial license above covers ONLY the original code in this repository,
+not the Milestone SDK. Anyone distributing compiled binaries that include the
+Milestone SDK assemblies must comply with Milestone's MIP SDK license terms —
+the official MSI release does so via the third-party notices file it installs
+(docs/gridlookout-NOTICES.md in this repository; NOTICES.md in the install
+folder).
